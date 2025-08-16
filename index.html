@@ -4,18 +4,20 @@
   <meta charset="UTF-8">
   <title>Five Lane Car Game</title>
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
       background: #111;
       overflow: hidden;
       font-family: sans-serif;
       color: white;
+      height: 100%;
       touch-action: none;
     }
     #gameCanvas {
-      background: #222;
       display: block;
       margin: auto;
+      background: #222;
       border: 2px solid white;
     }
     #overlay {
@@ -55,7 +57,7 @@
 </head>
 <body>
 
-<canvas id="gameCanvas" width="400" height="600"></canvas>
+<canvas id="gameCanvas"></canvas>
 
 <div id="overlay">
   <h1>Five Lane Car Game</h1>
@@ -72,10 +74,17 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
 const lanes = 5;
-const laneWidth = canvas.width / lanes;
+let laneWidth = canvas.width / lanes;
 let playerLane = 2;
-let playerY = canvas.height - 100;
+let playerY;
 const playerWidth = 40;
 const playerHeight = 60;
 
@@ -83,6 +92,12 @@ let enemies = [];
 let speed = 2;
 let score = 0;
 let gameRunning = false;
+
+function updateLaneWidth() {
+  laneWidth = canvas.width / lanes;
+  playerY = canvas.height - playerHeight - 20;
+}
+updateLaneWidth();
 
 function drawPlayer() {
   ctx.fillStyle = "cyan";
@@ -124,7 +139,7 @@ function detectCollision() {
 function drawScore() {
   ctx.fillStyle = "white";
   ctx.font = "20px Arial";
-  ctx.fillText("Score: " + score, 10, 20);
+  ctx.fillText("Score: " + score, 10, 30);
 }
 
 function gameOver() {
@@ -137,7 +152,8 @@ function gameOver() {
 function gameLoop() {
   if (!gameRunning) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
+
+  updateLaneWidth();
   drawPlayer();
   updateEnemies();
   drawEnemies();
@@ -167,7 +183,7 @@ document.getElementById("rightBtn").onclick = () => {
   if (playerLane < lanes - 1) playerLane++;
 };
 
-// Swipe support
+// Swipe control
 let touchStartX = null;
 canvas.addEventListener("touchstart", e => {
   touchStartX = e.changedTouches[0].screenX;
