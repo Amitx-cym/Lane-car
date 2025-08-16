@@ -5,38 +5,10 @@
   <title>5 Lane Car Game</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
-    body {
-      margin: 0;
-      background: black;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      overflow: hidden;
-      color: white;
-      font-family: Arial, sans-serif;
-    }
-    canvas {
-      display: block;
-      border: 2px solid black;
-      max-width: 100%;
-      height: auto;
-    }
-    #restartBtn {
-      display: none;
-      margin-top: 15px;
-      padding: 10px 20px;
-      font-size: 18px;
-      background: #ff4444;
-      border: none;
-      border-radius: 8px;
-      color: white;
-      cursor: pointer;
-    }
-    #restartBtn:hover {
-      background: #ff2222;
-    }
+    body { margin: 0; background: black; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; color: white; font-family: Arial, sans-serif; }
+    canvas { display: block; border: 2px solid black; max-width: 100%; height: auto; }
+    #restartBtn { display: none; margin-top: 15px; padding: 10px 20px; font-size: 18px; background: #ff4444; border: none; border-radius: 8px; color: white; cursor: pointer; }
+    #restartBtn:hover { background: #ff2222; }
   </style>
 </head>
 <body>
@@ -51,87 +23,100 @@
     const scoreDisplay = document.getElementById("score");
     const restartBtn = document.getElementById("restartBtn");
 
-    // Responsive canvas
-    canvas.width = Math.min(window.innerWidth * 0.9, 400);
-    canvas.height = window.innerHeight * 0.7;
-
+    canvas.width = Math.min(window.innerWidth*0.9, 400);
+    canvas.height = window.innerHeight*0.7;
     let laneWidth = canvas.width / 5;
     let laneCenters = [];
-    for (let i = 0; i < 5; i++) laneCenters.push(laneWidth * i + laneWidth / 2);
-
-    // Load car images
-    const playerCarImg = new Image();
-    playerCarImg.src = "https://i.ibb.co/9Y8VxYB/blue-car.png"; // player
-
-    const enemyCarImgs = [
-      "https://i.ibb.co/qFt7r3J/red-car.png",
-      "https://i.ibb.co/8mRn8M4/yellow-car.png",
-      "https://i.ibb.co/6RDdb7p/purple-car.png"
-    ].map(src => { const img = new Image(); img.src = src; return img; });
+    for(let i=0;i<5;i++) laneCenters.push(laneWidth*i + laneWidth/2);
 
     let playerLane, playerCar, obstacles, speed, score, highScore, gameOver;
 
-    function initGame() {
-      playerLane = 2;
-      playerCar = { x: laneCenters[playerLane] - 25, y: canvas.height - 120, width: 50, height: 80 };
-      obstacles = [];
-      speed = 5;
-      score = 0;
-      gameOver = false;
-      restartBtn.style.display = "none";
+    // Load images
+    let playerImg = new Image();
+    playerImg.src = "player.png"; // your player car PNG
+    let obstacleImgs = [
+      "red.png", // your enemy car PNGs
+      "green.png",
+      "yellow.png"
+    ].map(src=>{
+      let img = new Image();
+      img.src = src;
+      return img;
+    });
+
+    playerImg.onload = function(){
+      initGame();
+      updateGame();
+      setInterval(()=>{ if(!gameOver) spawnObstacle(); },1500);
+    }
+
+    function initGame(){
+      playerLane=2;
+      playerCar={x: laneCenters[playerLane]-25, y: canvas.height-120, width:50, height:80, img: playerImg};
+      obstacles=[];
+      speed=5;
+      score=0;
+      gameOver=false;
+      restartBtn.style.display="none";
       highScore = localStorage.getItem("highScore") || 0;
     }
 
-    function drawRoad() {
-      // Full road
-      ctx.fillStyle = "#555"; // gray
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    function drawRoad(){
+      ctx.fillStyle="#555";
+      ctx.fillRect(0,0,canvas.width,canvas.height);
 
-      // Lane dividers (5 lanes = 4 lines)
-      ctx.strokeStyle = "white";
-      ctx.lineWidth = 4;
-      ctx.setLineDash([20, 20]);
-      for (let i = 1; i < 5; i++) {
+      ctx.strokeStyle="white";
+      ctx.lineWidth=4;
+      ctx.setLineDash([20,20]);
+      for(let i=1;i<5;i++){
         ctx.beginPath();
-        ctx.moveTo(i * laneWidth, 0);
-        ctx.lineTo(i * laneWidth, canvas.height);
+        ctx.moveTo(i*laneWidth,0);
+        ctx.lineTo(i*laneWidth,canvas.height);
         ctx.stroke();
       }
       ctx.setLineDash([]);
     }
 
-    function drawCar(car, img) { ctx.drawImage(img, car.x, car.y, car.width, car.height); }
-
-    function moveLeft() { if(!gameOver && playerLane > 0) { playerLane--; playerCar.x = laneCenters[playerLane]-playerCar.width/2; } }
-    function moveRight() { if(!gameOver && playerLane < 4) { playerLane++; playerCar.x = laneCenters[playerLane]-playerCar.width/2; } }
-
-    function spawnObstacle() {
-      let lane = Math.floor(Math.random()*5);
-      let img = enemyCarImgs[Math.floor(Math.random()*enemyCarImgs.length)];
-      obstacles.push({ x: laneCenters[lane]-25, y: -100, width:50, height:80, img });
+    function drawCar(car){
+      if(car.img) ctx.drawImage(car.img, car.x, car.y, car.width, car.height);
+      else { ctx.fillStyle = car.color; ctx.fillRect(car.x, car.y, car.width, car.height); }
     }
 
-    function checkCollision(r1,r2){ return r1.x<r2.x+r2.width && r1.x+r1.width>r2.x && r1.y<r2.y+r2.height && r1.y+r1.height>r2.y;}
+    function moveLeft(){ if(!gameOver && playerLane>0){ playerLane--; playerCar.x = laneCenters[playerLane]-playerCar.width/2; } }
+    function moveRight(){ if(!gameOver && playerLane<4){ playerLane++; playerCar.x = laneCenters[playerLane]-playerCar.width/2; } }
 
-    function updateGame() {
+    function spawnObstacle(){
+      let lane = Math.floor(Math.random()*5);
+      let img = obstacleImgs[Math.floor(Math.random()*obstacleImgs.length)];
+      obstacles.push({x: laneCenters[lane]-25, y:-100, width:50, height:80, img: img});
+    }
+
+    function checkCollision(r1,r2){
+      return r1.x<r2.x+r2.width && r1.x+r1.width>r2.x && r1.y<r2.y+r2.height && r1.y+r1.height>r2.y;
+    }
+
+    function updateGame(){
       if(gameOver) return;
 
       ctx.clearRect(0,0,canvas.width,canvas.height);
       drawRoad();
 
-      // Move obstacles
-      obstacles.forEach(o => { o.y += speed; if(checkCollision(playerCar,o)){ gameOver=true; restartBtn.style.display="block"; if(score>highScore){ highScore=score; localStorage.setItem("highScore", highScore); } } });
+      obstacles.forEach(o=>{ 
+        o.y+=speed; 
+        if(checkCollision(playerCar,o)){ 
+          gameOver=true; 
+          restartBtn.style.display="block"; 
+          if(score>highScore){ highScore=score; localStorage.setItem("highScore",highScore); } 
+        } 
+      });
       obstacles = obstacles.filter(o=>o.y<canvas.height);
 
-      // Draw cars
-      drawCar(playerCar, playerCarImg);
-      obstacles.forEach(o=>drawCar(o,o.img));
+      drawCar(playerCar);
+      obstacles.forEach(drawCar);
 
-      // Score
       score++;
       scoreDisplay.textContent = "Score: "+score+" | High Score: "+highScore;
 
-      // Speed up
       if(score%500===0) speed+=0.5;
 
       requestAnimationFrame(updateGame);
@@ -139,16 +124,10 @@
 
     document.addEventListener("keydown", e=>{ if(e.key==="ArrowLeft") moveLeft(); if(e.key==="ArrowRight") moveRight(); });
     canvas.addEventListener("touchstart", e=>{ 
-      let x=e.touches[0].clientX-canvas.getBoundingClientRect().left; 
-      if(x<canvas.width/2) moveLeft(); else moveRight(); 
+      let x=e.touches[0].clientX-canvas.getBoundingClientRect().left;
+      if(x<canvas.width/2) moveLeft(); else moveRight();
     });
     restartBtn.addEventListener("click", ()=>{ initGame(); updateGame(); });
-
-    setInterval(()=>{ if(!gameOver) spawnObstacle(); },1500);
-
-    // Start game
-    initGame();
-    updateGame();
   </script>
 </body>
 </html>
