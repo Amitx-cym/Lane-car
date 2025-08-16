@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Five Lane Car Game</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      overflow: hidden;
+      font-family: sans-serif;
+      color: white;
+      touch-action: none;
+    }
+    #gameCanvas {
+      background: #222;
+      display: block;
+      margin: auto;
+      border: 2px solid white;
+    }
+    #overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 10;
+    }
+    #overlay button {
+      padding: 10px 20px;
+      font-size: 18px;
+      margin-top: 10px;
+    }
+    #controls {
+      position: fixed;
+      bottom: 10px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      z-index: 5;
+    }
+    .ctrl-btn {
+      background: #555;
+      color: white;
+      font-size: 24px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+
+<div id="overlay">
+  <h1>Five Lane Car Game</h1>
+  <p>Swipe or use buttons to move left/right. Avoid enemy cars!</p>
+  <button id="startBtn">Start Game</button>
+</div>
+
+<div id="controls">
+  <button class="ctrl-btn" id="leftBtn">⬅</button>
+  <button class="ctrl-btn" id="rightBtn">➡</button>
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const lanes = 5;
+const laneWidth = canvas.width / lanes;
+let playerLane = 2;
+let playerY = canvas.height - 100;
+const playerWidth = 40;
+const playerHeight = 60;
+
+let enemies = [];
+let speed = 2;
+let score = 0;
+let gameRunning = false;
+
+function drawPlayer() {
+  ctx.fillStyle = "cyan";
+  ctx.fillRect(playerLane * laneWidth + laneWidth/2 - playerWidth/2, playerY, playerWidth, playerHeight);
+}
+
+function drawEnemies() {
+  ctx.fillStyle = "red";
+  enemies.forEach(e => {
+    ctx.fillRect(e.x, e.y, playerWidth, playerHeight);
+  });
+}
+
+function updateEnemies() {
+  enemies.forEach(e => e.y += speed);
+  enemies = enemies.filter(e => e.y < canvas.height);
+  if (Math.random() < 0.02) {
+    let lane = Math.floor(Math.random() * lanes);
+    enemies.push({ 
+      x: lane * laneWidth + laneWidth/2 - playerWidth/2, 
+      y: -playerHeight 
+    });
+  }
+}
+
+function detectCollision() {
+  for (let e of enemies) {
+    if (
+      e.x < playerLane * laneWidth + laneWidth/2 + playerWidth/2 &&
+      e.x + playerWidth > playerLane * laneWidth + laneWidth/2 - playerWidth/2 &&
+      e.y < playerY + playerHeight &&
+      e.y + playerHeight > playerY
+    ) {
+      gameOver();
+    }
+  }
+}
+
+function drawScore() {
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText("Score: " + score, 10, 20);
+}
+
+function gameOver() {
+  gameRunning = false;
+  document.getElementById("overlay").style.display = "flex";
+  document.querySelector("#overlay h1").innerText = "Game Over";
+  document.querySelector("#overlay p").innerText = "Your score: " + score;
+}
+
+function gameLoop() {
+  if (!gameRunning) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  drawPlayer();
+  updateEnemies();
+  drawEnemies();
+  detectCollision();
+  drawScore();
+
+  score++;
+  speed += 0.001;
+
+  requestAnimationFrame(gameLoop);
+}
+
+document.getElementById("startBtn").onclick = () => {
+  enemies = [];
+  speed = 2;
+  score = 0;
+  playerLane = 2;
+  gameRunning = true;
+  document.getElementById("overlay").style.display = "none";
+  gameLoop();
+};
+
+document.getElementById("leftBtn").onclick = () => {
+  if (playerLane > 0) playerLane--;
+};
+document.getElementById("rightBtn").onclick = () => {
+  if (playerLane < lanes - 1) playerLane++;
+};
+
+// Swipe support
+let touchStartX = null;
+canvas.addEventListener("touchstart", e => {
+  touchStartX = e.changedTouches[0].screenX;
+});
+canvas.addEventListener("touchend", e => {
+  let touchEndX = e.changedTouches[0].screenX;
+  if (touchStartX - touchEndX > 50) {
+    if (playerLane > 0) playerLane--;
+  } else if (touchEndX - touchStartX > 50) {
+    if (playerLane < lanes - 1) playerLane++;
+  }
+});
+</script>
+
+</body>
+</html>
