@@ -5,37 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Car Game</title>
 <style>
-  body, html {
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    background: #333;
-  }
-  canvas {
-    display: block;
-  }
+  body, html { margin:0; padding:0; overflow:hidden; background:#333; }
+  canvas { display:block; }
   #score {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    color: white;
-    font-size: 24px;
-    font-family: sans-serif;
-    z-index: 10;
+    position:absolute;
+    top:10px;
+    left:10px;
+    color:white;
+    font-size:24px;
+    font-family:sans-serif;
+    z-index:10;
   }
   #restartBtn {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    padding: 15px 30px;
-    font-size: 24px;
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    padding:15px 30px;
+    font-size:24px;
     background: rgba(255,255,255,0.8);
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    display: none;
-    z-index: 10;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    display:none;
+    z-index:10;
   }
 </style>
 </head>
@@ -58,15 +51,17 @@ resizeCanvas();
 const laneCount = 5;
 let laneWidth = canvas.width / laneCount;
 
+// Load images
 const playerImg = new Image();
-playerImg.src = "player.png"; // your player car PNG
+playerImg.src = "player.png"; // make sure this is correct and in the same folder
 
 const obstacleImgs = ["red.png","green.png","yellow.png"].map(src=>{
   let img = new Image();
-  img.src = src; // your enemy car PNGs
+  img.src = src;
   return img;
 });
 
+// Game variables
 let player = {
   lane: 2,
   y: canvas.height - 150,
@@ -89,32 +84,29 @@ document.addEventListener("keydown", e=>{
   if(e.key === "ArrowRight" && player.lane<laneCount-1) player.lane++;
 });
 
-// Mobile Touch & Drag Controls
+// Mobile swipe controls
 let startX = null;
-
-canvas.addEventListener("touchstart", e => {
-  startX = e.touches[0].clientX;
-});
-
+canvas.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
 canvas.addEventListener("touchmove", e => {
   if (!startX) return;
   let touchX = e.touches[0].clientX;
   let delta = touchX - startX;
+  if(delta>30 && player.lane<laneCount-1){ player.lane++; startX = touchX;}
+  else if(delta<-30 && player.lane>0){ player.lane--; startX = touchX;}
+});
+canvas.addEventListener("touchend", e => { startX=null; });
 
-  if (delta > 30 && player.lane < laneCount - 1) { // swipe right
-    player.lane++;
-    startX = touchX;
-  } else if (delta < -30 && player.lane > 0) { // swipe left
-    player.lane--;
-    startX = touchX;
-  }
+// Restart
+restartBtn.addEventListener("click", ()=>{
+  gameOver=false;
+  obstacles=[];
+  score=0;
+  player.lane=2;
+  restartBtn.style.display="none";
+  gameLoop();
 });
 
-canvas.addEventListener("touchend", e => {
-  startX = null;
-});
-
-// Game loop
+// Main game loop
 function gameLoop(){
   if(gameOver) return;
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -124,7 +116,7 @@ function gameLoop(){
   // Draw lanes
   ctx.strokeStyle = "white";
   ctx.lineWidth = 4;
-  ctx.setLineDash([20, 20]);
+  ctx.setLineDash([20,20]);
   for(let i=1;i<laneCount;i++){
     ctx.beginPath();
     ctx.moveTo(i*laneWidth,0);
@@ -133,8 +125,10 @@ function gameLoop(){
   }
   ctx.setLineDash([]);
 
-  // Draw player
-  ctx.drawImage(playerImg, player.lane*laneWidth + laneWidth*0.2, player.y, player.width, player.height);
+  // Draw player after image loaded
+  if(playerImg.complete) {
+    ctx.drawImage(playerImg, player.lane*laneWidth + laneWidth*0.2, player.y, player.width, player.height);
+  }
 
   // Spawn obstacles randomly
   spawnTimer--;
@@ -145,8 +139,8 @@ function gameLoop(){
     obstacles.push({
       lane: laneIndex,
       y: -120,
-      width: laneWidth * 0.6,
-      height: 100,
+      width: laneWidth*0.6,
+      height:100,
       img: obstacleImgs[Math.floor(Math.random()*obstacleImgs.length)]
     });
   }
@@ -155,37 +149,30 @@ function gameLoop(){
   for(let i=obstacles.length-1;i>=0;i--){
     let obs = obstacles[i];
     obs.y += obstacleSpeed;
-    ctx.drawImage(obs.img, obs.lane*laneWidth + laneWidth*0.2, obs.y, obs.width, obs.height);
-
-    // Collision
-    if(obs.y + obs.height > player.y && obs.y < player.y + player.height && obs.lane === player.lane){
-      gameOver = true;
-      restartBtn.style.display = "block";
+    if(obs.img.complete) {
+      ctx.drawImage(obs.img, obs.lane*laneWidth + laneWidth*0.2, obs.y, obs.width, obs.height);
     }
 
-    // Remove off-screen obstacles
-    if(obs.y > canvas.height) obstacles.splice(i,1);
+    // Collision detection
+    if(obs.y + obs.height > player.y && obs.y < player.y + player.height && obs.lane === player.lane){
+      gameOver = true;
+      restartBtn.style.display="block";
+    }
+
+    if(obs.y>canvas.height) obstacles.splice(i,1);
   }
 
   // Update score
   score++;
-  scoreDiv.textContent = "Score: " + score;
+  scoreDiv.textContent = "Score: "+score;
 
   requestAnimationFrame(gameLoop);
 }
 
-// Restart game
-restartBtn.addEventListener("click", ()=>{
-  gameOver = false;
-  obstacles = [];
-  score = 0;
-  player.lane = 2;
-  restartBtn.style.display = "none";
+// Start game only after player image is loaded
+playerImg.onload = ()=>{
   gameLoop();
-});
-
-// Start game
-gameLoop();
+}
 </script>
 </body>
 </html>
