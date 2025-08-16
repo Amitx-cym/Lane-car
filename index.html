@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>5 Lane Car Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
     body {
       margin: 0;
@@ -20,6 +21,8 @@
       background: #228B22; /* green grass */
       display: block;
       border: 2px solid black;
+      max-width: 100%;
+      height: auto;
     }
     #restartBtn {
       display: none;
@@ -39,7 +42,7 @@
 </head>
 <body>
   <h1>🚗 5 Lane Car Game</h1>
-  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <canvas id="gameCanvas"></canvas>
   <div id="score">Score: 0</div>
   <button id="restartBtn">Restart Game</button>
 
@@ -49,11 +52,29 @@
     const scoreDisplay = document.getElementById("score");
     const restartBtn = document.getElementById("restartBtn");
 
+    // Adjust canvas to screen
+    canvas.width = Math.min(window.innerWidth * 0.9, 400);
+    canvas.height = window.innerHeight * 0.7;
+
     let laneWidth = (canvas.width - 100) / 5;
     let laneCenters = [];
     for (let i = 0; i < 5; i++) {
       laneCenters.push(50 + laneWidth / 2 + i * laneWidth);
     }
+
+    // Load car images
+    const playerCarImg = new Image();
+    playerCarImg.src = "https://i.imgur.com/4d8b5d8.png"; // 🔵 blue car PNG
+
+    const enemyCarImgs = [
+      "https://i.imgur.com/xpXHcYZ.png", // red
+      "https://i.imgur.com/zoj6tZp.png", // yellow
+      "https://i.imgur.com/XcFjCw3.png", // purple
+    ].map(src => {
+      const img = new Image();
+      img.src = src;
+      return img;
+    });
 
     let playerLane, playerCar, obstacles, roadStripes, speed, score, gameOver;
 
@@ -63,8 +84,7 @@
         x: laneCenters[playerLane] - 25,
         y: canvas.height - 120,
         width: 50,
-        height: 80,
-        color: "blue"
+        height: 80
       };
       obstacles = [];
       roadStripes = [];
@@ -110,9 +130,8 @@
       });
     }
 
-    function drawCar(car) {
-      ctx.fillStyle = car.color;
-      ctx.fillRect(car.x, car.y, car.width, car.height);
+    function drawCar(car, img) {
+      ctx.drawImage(img, car.x, car.y, car.width, car.height);
     }
 
     function moveLeft() {
@@ -131,15 +150,14 @@
 
     function spawnObstacle() {
       let randomLane = Math.floor(Math.random() * 5);
-      let colors = ["red", "yellow", "purple", "orange", "pink"];
-      let randomColor = colors[Math.floor(Math.random() * colors.length)];
+      let randomImg = enemyCarImgs[Math.floor(Math.random() * enemyCarImgs.length)];
 
       obstacles.push({
         x: laneCenters[randomLane] - 25,
         y: -100,
         width: 50,
         height: 80,
-        color: randomColor
+        img: randomImg
       });
     }
 
@@ -176,8 +194,8 @@
       obstacles = obstacles.filter(obs => obs.y < canvas.height);
 
       // Draw everything
-      drawCar(playerCar);
-      obstacles.forEach(drawCar);
+      drawCar(playerCar, playerCarImg);
+      obstacles.forEach(obs => drawCar(obs, obs.img));
 
       // Update score
       score++;
