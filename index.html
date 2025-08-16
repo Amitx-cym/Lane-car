@@ -17,7 +17,7 @@
     #gameCanvas {
       display: block;
       margin: auto;
-      background: #222;
+      background: #333;
       border: 2px solid white;
     }
     #overlay {
@@ -36,23 +36,6 @@
       font-size: 18px;
       margin-top: 10px;
     }
-    #controls {
-      position: fixed;
-      bottom: 10px;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      z-index: 5;
-    }
-    .ctrl-btn {
-      background: #555;
-      color: white;
-      font-size: 24px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 10px;
-    }
   </style>
 </head>
 <body>
@@ -61,13 +44,8 @@
 
 <div id="overlay">
   <h1>Five Lane Car Game</h1>
-  <p>Swipe or use buttons to move left/right. Avoid enemy cars!</p>
+  <p>Tap left/right side of screen (or use arrow keys) to move. Avoid enemy cars!</p>
   <button id="startBtn">Start Game</button>
-</div>
-
-<div id="controls">
-  <button class="ctrl-btn" id="leftBtn">⬅</button>
-  <button class="ctrl-btn" id="rightBtn">➡</button>
 </div>
 
 <script>
@@ -84,9 +62,10 @@ resizeCanvas();
 const lanes = 5;
 let laneWidth = canvas.width / lanes;
 let playerLane = 2;
+
+const playerWidth = 60;
+const playerHeight = 100;
 let playerY;
-const playerWidth = 40;
-const playerHeight = 60;
 
 let enemies = [];
 let speed = 2;
@@ -95,9 +74,23 @@ let gameRunning = false;
 
 function updateLaneWidth() {
   laneWidth = canvas.width / lanes;
-  playerY = canvas.height - playerHeight - 20;
+  playerY = canvas.height - playerHeight - 30;
 }
-updateLaneWidth();
+
+// 🟢 Draw lane dividers
+function drawLanes() {
+  ctx.strokeStyle = "white";
+  ctx.setLineDash([30, 20]); // dashed line
+  ctx.lineWidth = 4;
+  for (let i = 1; i < lanes; i++) {
+    let x = i * laneWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]); // reset
+}
 
 function drawPlayer() {
   ctx.fillStyle = "cyan";
@@ -154,6 +147,7 @@ function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   updateLaneWidth();
+  drawLanes();   // draw lanes
   drawPlayer();
   updateEnemies();
   drawEnemies();
@@ -176,25 +170,21 @@ document.getElementById("startBtn").onclick = () => {
   gameLoop();
 };
 
-document.getElementById("leftBtn").onclick = () => {
-  if (playerLane > 0) playerLane--;
-};
-document.getElementById("rightBtn").onclick = () => {
-  if (playerLane < lanes - 1) playerLane++;
-};
-
-// Swipe control
-let touchStartX = null;
-canvas.addEventListener("touchstart", e => {
-  touchStartX = e.changedTouches[0].screenX;
-});
-canvas.addEventListener("touchend", e => {
-  let touchEndX = e.changedTouches[0].screenX;
-  if (touchStartX - touchEndX > 50) {
+// Phone: tap left/right side of screen
+canvas.addEventListener("click", e => {
+  if (!gameRunning) return;
+  if (e.clientX < canvas.width / 2) {
     if (playerLane > 0) playerLane--;
-  } else if (touchEndX - touchStartX > 50) {
+  } else {
     if (playerLane < lanes - 1) playerLane++;
   }
+});
+
+// PC: keyboard controls
+document.addEventListener("keydown", e => {
+  if (!gameRunning) return;
+  if (e.key === "ArrowLeft" && playerLane > 0) playerLane--;
+  if (e.key === "ArrowRight" && playerLane < lanes - 1) playerLane++;
 });
 </script>
 
