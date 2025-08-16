@@ -15,7 +15,7 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Fullscreen
+// Fullscreen canvas
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
@@ -23,20 +23,27 @@ canvas.height = window.innerHeight;
 const lanes = 5;
 const laneWidth = canvas.width / lanes;
 const carWidth = laneWidth - 20;
-const carHeight = 80;
+const carHeight = 100;
 let score = 0;
+let highScore = localStorage.getItem("highScore") || 0;
+let speed = 6;
+let gameOver = false;
 
-// Player car
+// Load car images
+const playerCarImg = new Image();
+playerCarImg.src = "player_car.png";  // your player car PNG
+const enemyCarImg = new Image();
+enemyCarImg.src = "enemy_car.png";    // your enemy car PNG
+
+// Player
 let player = {
-  lane: 2, // start in middle lane
+  lane: 2,
   x: 2 * laneWidth + 10,
-  y: canvas.height - carHeight - 20,
-  color: "blue"
+  y: canvas.height - carHeight - 20
 };
 
 // Enemies
 let enemies = [];
-let speed = 6;
 
 // Controls
 let leftPressed = false;
@@ -45,19 +52,21 @@ let rightPressed = false;
 document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") leftPressed = true;
   if (e.key === "ArrowRight") rightPressed = true;
+  if (gameOver && e.key === "Enter") resetGame();
 });
 document.addEventListener("keyup", (e) => {
   if (e.key === "ArrowLeft") leftPressed = false;
   if (e.key === "ArrowRight") rightPressed = false;
 });
 
-// Mobile touch
+// Mobile controls
 document.addEventListener("touchstart", (e) => {
-  let touchX = e.touches[0].clientX;
-  if (touchX < canvas.width / 2) {
-    moveLeft();
+  if (gameOver) {
+    resetGame();
   } else {
-    moveRight();
+    let touchX = e.touches[0].clientX;
+    if (touchX < canvas.width / 2) moveLeft();
+    else moveRight();
   }
 });
 
@@ -77,28 +86,61 @@ function moveRight() {
 
 // Spawn enemies
 function spawnEnemy() {
-  let lane = Math.floor(Math.random() * lanes);
-  enemies.push({
-    lane: lane,
-    x: lane * laneWidth + 10,
-    y: -carHeight,
-    color: "red"
-  });
+  if (!gameOver) {
+    let lane = Math.floor(Math.random() * lanes);
+    enemies.push({
+      lane: lane,
+      x: lane * laneWidth + 10,
+      y: -carHeight
+    });
+  }
 }
 setInterval(spawnEnemy, 1200);
 
-// Draw car function
-function drawCar(x, y, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, carWidth, carHeight);
-  // wheels
-  ctx.fillStyle = "black";
-  ctx.fillRect(x + 5, y + carHeight - 10, 12, 8);
-  ctx.fillRect(x + carWidth - 17, y + carHeight - 10, 12, 8);
+// Draw car
+function drawCar(img, x, y) {
+  ctx.drawImage(img, x, y, carWidth, carHeight);
+}
+
+// Reset game
+function resetGame() {
+  enemies = [];
+  score = 0;
+  speed = 6;
+  player.lane = 2;
+  player.x = player.lane * laneWidth + 10;
+  gameOver = false;
+  gameLoop();
+}
+
+// End game
+function endGame() {
+  gameOver = true;
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem("highScore", highScore);
+  }
+
+  // Overlay
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "48px Arial";
+  ctx.fillText("GAME OVER", canvas.width/2 - 150, canvas.height/2 - 60);
+  ctx.font = "32px Arial";
+  ctx.fillText("Score: " + score, canvas.width/2 - 80, canvas.height/2);
+  ctx.fillText("Best: " + highScore, canvas.width/2 - 80, canvas.height/2 + 50);
+
+  ctx.fillStyle = "yellow";
+  ctx.font = "28px Arial";
+  ctx.fillText("Tap or Press Enter to Restart", canvas.width/2 - 200, canvas.height/2 + 120);
 }
 
 // Game loop
 function gameLoop() {
+  if (gameOver) return;
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Draw lanes
@@ -111,10 +153,10 @@ function gameLoop() {
     ctx.stroke();
   }
 
-  // Move enemies
+  // Move and draw enemies
   for (let enemy of enemies) {
     enemy.y += speed;
-    drawCar(enemy.x, enemy.y, enemy.color);
+    drawCar(enemyCarImg, enemy.x, enemy.y);
 
     // Collision check
     if (
@@ -122,21 +164,25 @@ function gameLoop() {
       enemy.y + carHeight > player.y &&
       enemy.y < player.y + carHeight
     ) {
-      alert("Game Over! Your Score: " + score);
-      document.location.reload();
+      endGame();
+      return;
     }
   }
 
   // Draw player
-  drawCar(player.x, player.y, player.color);
+  drawCar(playerCarImg, player.x, player.y);
 
   // Scoreboard
   ctx.fillStyle = "white";
   ctx.font = "24px Arial";
   ctx.fillText("Score: " + score, 10, 30);
-  score++;
+  ctx.fillText("Best: " + highScore, 10, 60);
 
-  // Handle input
+  // Update score & difficulty
+  score++;
+  if (score % 500 === 0) speed++;
+
+  // Handle movement
   if (leftPressed) {
     moveLeft();
     leftPressed = false;
@@ -149,7 +195,12 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
+// Start game when images load
+playerCarImg.onload = () => {
+  enemyCarImg.onload = () => {
+    gameLoop();
+  };
+};
 </script>
 </body>
 </html>
