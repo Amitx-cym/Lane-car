@@ -84,17 +84,15 @@ document.addEventListener("keydown", e=>{
   if(e.key === "ArrowRight" && player.lane<laneCount-1) player.lane++;
 });
 
-// Mobile swipe controls
-let startX = null;
-canvas.addEventListener("touchstart", e => { startX = e.touches[0].clientX; });
-canvas.addEventListener("touchmove", e => {
-  if (!startX) return;
+// Mobile touch controls (touch left/right)
+canvas.addEventListener("touchstart", e => {
   let touchX = e.touches[0].clientX;
-  let delta = touchX - startX;
-  if(delta>30 && player.lane<laneCount-1){ player.lane++; startX = touchX;}
-  else if(delta<-30 && player.lane>0){ player.lane--; startX = touchX;}
+  if(touchX < canvas.width/2 && player.lane > 0) {
+    player.lane--; // move left
+  } else if(touchX >= canvas.width/2 && player.lane < laneCount-1) {
+    player.lane++; // move right
+  }
 });
-canvas.addEventListener("touchend", e => { startX=null; });
 
 // Restart
 restartBtn.addEventListener("click", ()=>{
