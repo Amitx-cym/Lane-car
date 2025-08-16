@@ -11,44 +11,30 @@
     --divider:#ffffff;
     --hud-bg: rgba(0,0,0,0.35);
     --hud-border: rgba(255,255,255,0.08);
+    --err-bg: rgba(255,30,30,0.95);
   }
-  html,body{
-    height:100%;
-    margin:0;
-    background:linear-gradient(180deg,#07101a 0%, #051018 100%);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    -webkit-tap-highlight-color: transparent;
-  }
+  html,body{ height:100%; margin:0; background:linear-gradient(180deg,#07101a 0%, #051018 100%); font-family:system-ui, -apple-system, "Segoe UI", Roboto, Arial; -webkit-tap-highlight-color:transparent;}
   #gameWrap{ position:relative; width:100%; height:100vh; overflow:hidden; display:block; }
   canvas{ display:block; width:100%; height:100%; background:var(--road); }
-  /* Overlay / start screen */
-  .overlay{
-    position:absolute; inset:0; display:grid; place-items:center; z-index:40;
-    background:linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.45));
-    color:white; padding:20px;
-  }
-  .card{
-    background: rgba(255,255,255,0.03);
-    border:1px solid var(--hud-border);
-    padding:18px; border-radius:14px; width:min(92%,420px); text-align:center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  }
-  .title{ font-size:20px; margin:0 0 6px; font-weight:800; letter-spacing:0.4px; }
+
+  .overlay{ position:absolute; inset:0; display:grid; place-items:center; z-index:40; background:linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.45)); color:white; padding:20px; }
+  .card{ background: rgba(255,255,255,0.03); border:1px solid var(--hud-border); padding:18px; border-radius:14px; width:min(92%,420px); text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.5); }
+  .title{ font-size:20px; margin:0 0 6px; font-weight:800; }
   .subtitle{ font-size:13px; margin:0 0 12px; opacity:0.9; }
   .btn{ appearance:none; border:none; background:linear-gradient(135deg,#7c4dff,#3b82f6); color:white; padding:10px 14px; border-radius:10px; font-weight:800; cursor:pointer; }
   .btn.secondary{ background:transparent; border:1px solid rgba(255,255,255,0.08); margin-left:8px; }
 
-  /* HUD */
-  .hud{
-    position:absolute; top:12px; left:12px; z-index:50;
-    background:var(--hud-bg); border:1px solid var(--hud-border); color:white; padding:8px 12px; border-radius:999px;
-    font-weight:700; display:flex; gap:14px; align-items:center;
-  }
-  .best{ font-size:13px; opacity:0.9; font-weight:600;}
+  .hud{ position:absolute; top:12px; left:12px; z-index:50; background:var(--hud-bg); border:1px solid var(--hud-border); color:white; padding:8px 12px; border-radius:999px; font-weight:700; display:flex; gap:14px; align-items:center; }
+  .best{ font-size:13px; opacity:0.9; font-weight:600; }
   .score{ font-size:16px; letter-spacing:0.6px; }
-
-  /* small note */
   .note{ position:absolute; bottom:12px; left:12px; color:rgba(255,255,255,0.8); font-size:12px; z-index:50; background:var(--hud-bg); padding:6px 10px; border-radius:10px; border:1px solid var(--hud-border); }
+
+  /* Error overlay style */
+  #errorBox{
+    position:fixed; left:8px; right:8px; top:8px; z-index:9999;
+    background:var(--err-bg); color:white; padding:10px 12px; border-radius:8px; font-family:monospace;
+    display:none; white-space:pre-wrap; box-shadow:0 8px 30px rgba(0,0,0,0.6);
+  }
 </style>
 </head>
 <body>
@@ -83,10 +69,26 @@
     </div>
 
     <div class="note">Tap left / right to steer • Works on phone & PC</div>
+    <div id="errorBox" role="alert"></div>
   </div>
 
 <script>
 (() => {
+  // ----- simple on-screen error catcher (shows runtime errors) -----
+  const errorBox = document.getElementById('errorBox');
+  function showError(msg){
+    errorBox.style.display = 'block';
+    errorBox.textContent = String(msg).slice(0, 1200);
+    console.error(msg);
+  }
+  window.addEventListener('error', (ev) => {
+    showError('Error: ' + (ev.message || ev.error || 'unknown') + '\\n' + (ev.filename ? (ev.filename + ':' + ev.lineno) : ''));
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    showError('Unhandled Promise rejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason)));
+  });
+
+  // ----- main game code -----
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d', {alpha:false});
 
@@ -100,15 +102,16 @@
   const bestEl = document.getElementById('best');
   const finalScoreEl = document.getElementById('finalScore');
 
-  // HiDPI canvas resize
   function resize(){
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(window.innerWidth * dpr);
-    canvas.height = Math.round(window.innerHeight * dpr);
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0); // draw in CSS pixels
-    computeLayout();
+    try{
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(window.innerWidth * dpr);
+      canvas.height = Math.round(window.innerHeight * dpr);
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      computeLayout();
+    }catch(e){ showError(e); }
   }
   window.addEventListener('resize', resize, {passive:true});
   resize();
@@ -118,9 +121,9 @@
   let laneWidth = 0;
   let laneCenters = [];
   let player = { lane: 2, w: 0, h: 0, y:0 };
-  let enemies = []; // { lane, x, y, w, h, color, speed }
-  let speed = 4; // starting speed
-  const speedGrowth = 0.003; // per frame increase
+  let enemies = [];
+  let speed = 4;
+  const speedGrowth = 0.003;
   let score = 0;
   let best = parseInt(localStorage.getItem('five_lane_best') || '0', 10) || 0;
   bestEl.textContent = best;
@@ -128,34 +131,25 @@
   let paused = false;
   let lastTime = 0;
 
-  // layout compute: responsive sizes
   function computeLayout(){
     laneWidth = window.innerWidth / LANES;
-    laneCenters = new Array(LANES).fill(0).map((_,i) => (i + 0.5) * laneWidth);
-    player.w = Math.max(48, laneWidth * 0.6); // car width relative to lane
+    laneCenters = new Array(LANES).fill(0).map((_,i) => (i + 0.5) * laneWidth); // <-- correct: new Array, not New Array
+    player.w = Math.max(48, laneWidth * 0.6);
     player.h = Math.max(80, player.w * 1.5);
     player.y = window.innerHeight - player.h - Math.round(window.innerHeight * 0.05);
   }
-
-  computeLayout();
 
   // helpers
   function rand(min,max){ return Math.random() * (max - min) + min; }
   function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
-  // draw lane background + dividers
   function drawRoad(){
-    // road fill
     ctx.fillStyle = '#2f343a';
     ctx.fillRect(0,0,window.innerWidth,window.innerHeight);
-
-    // slight lane tint
     for(let i=0;i<LANES;i++){
       ctx.fillStyle = (i%2===0) ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.01)';
       ctx.fillRect(i*laneWidth,0,laneWidth,window.innerHeight);
     }
-
-    // dashed dividers
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth = Math.max(2, Math.round(laneWidth * 0.04));
     ctx.setLineDash([Math.round(laneWidth*0.06), Math.round(laneWidth*0.06)]);
@@ -169,37 +163,6 @@
     ctx.setLineDash([]);
   }
 
-  // draw a car (x,y top-left), simple 2D car with windows & wheels
-  function drawCar(x, y, w, h, color, isEnemy=false){
-    const radius = Math.max(6, Math.round(w * 0.06));
-    // body
-    ctx.fillStyle = color;
-    roundRect(ctx, x, y, w, h, radius, true, false);
-
-    // roof/inner window
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    const winH = Math.max(10, Math.round(h*0.22));
-    const winW = Math.max(12, Math.round(w*0.45));
-    const winX = x + (w - winW)/2;
-    const winY = y + Math.round(h*0.12);
-    roundRect(ctx, winX, winY, winW, winH, Math.round(winH/2), true, false);
-
-    // wheels
-    const wheelW = Math.max(8, Math.round(w * 0.18));
-    const wheelH = Math.max(6, Math.round(h * 0.12));
-    ctx.fillStyle = '#111';
-    ctx.fillRect(x + 8, y + h - wheelH - 4, wheelW, wheelH);
-    ctx.fillRect(x + w - wheelW - 8, y + h - wheelH - 4, wheelW, wheelH);
-
-    // small brake lights for enemies
-    if(isEnemy){
-      ctx.fillStyle = 'rgba(255,40,40,0.95)';
-      const bW = Math.round(w*0.28), bH = Math.max(4, Math.round(h*0.08));
-      ctx.fillRect(x + (w-bW)/2, y + h - bH - 2, bW, bH);
-    }
-  }
-
-  // rounded rect helper
   function roundRect(ctx, x, y, w, h, r, fill, stroke){
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -212,13 +175,33 @@
     if(stroke) ctx.stroke();
   }
 
-  // spawn enemy cars — can spawn 1..3 cars per wave, avoid same-lane overlap at spawn
+  function drawCar(x, y, w, h, color, isEnemy=false){
+    const radius = Math.max(6, Math.round(w * 0.06));
+    ctx.fillStyle = color;
+    roundRect(ctx, x, y, w, h, radius, true, false);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    const winH = Math.max(10, Math.round(h*0.22));
+    const winW = Math.max(12, Math.round(w*0.45));
+    const winX = x + (w - winW)/2;
+    const winY = y + Math.round(h*0.12);
+    roundRect(ctx, winX, winY, winW, winH, Math.round(winH/2), true, false);
+    const wheelW = Math.max(8, Math.round(w * 0.18));
+    const wheelH = Math.max(6, Math.round(h * 0.12));
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x + 8, y + h - wheelH - 4, wheelW, wheelH);
+    ctx.fillRect(x + w - wheelW - 8, y + h - wheelH - 4, wheelW, wheelH);
+    if(isEnemy){
+      ctx.fillStyle = 'rgba(255,40,40,0.95)';
+      const bW = Math.round(w*0.28), bH = Math.max(4, Math.round(h*0.08));
+      ctx.fillRect(x + (w-bW)/2, y + h - bH - 2, bW, bH);
+    }
+  }
+
   function spawnWave(){
-    const waveSize = Math.random() < 0.25 ? 2 : 1; // sometimes 2
+    const waveSize = Math.random() < 0.25 ? 2 : 1;
     const used = [];
     for(let i=0;i<waveSize;i++){
       let lane = Math.floor(rand(0, LANES));
-      // avoid duplicates
       let attempts = 0;
       while(used.includes(lane) && attempts < 8){
         lane = Math.floor(rand(0, LANES));
@@ -235,12 +218,8 @@
     }
   }
 
-  // collision: player rect vs enemy rect
-  function rectsOverlap(a,b){
-    return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h);
-  }
+  function rectsOverlap(a,b){ return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h); }
 
-  // game control functions
   function resetGame(){
     enemies = [];
     score = 0;
@@ -255,137 +234,81 @@
   function endGame(){
     running = false;
     finalScoreEl.textContent = Math.floor(score);
-    // update best
     const s = Math.floor(score);
     if(s > best){ best = s; localStorage.setItem('five_lane_best', String(best)); bestEl.textContent = best; }
-    // show overlay
     gameoverOverlay.style.display = 'flex';
   }
 
-  // input: mobile tap left/right and keyboard
-  // mobile: use pointerdown to cover taps and clicks
+  // input
   canvas.addEventListener('pointerdown', (ev) => {
     if(!running) return;
     const x = ev.clientX;
-    if(x < window.innerWidth / 2) {
-      player.lane = Math.max(0, player.lane - 1);
-    } else {
-      player.lane = Math.min(LANES - 1, player.lane + 1);
-    }
+    if(x < window.innerWidth / 2) player.lane = Math.max(0, player.lane - 1);
+    else player.lane = Math.min(LANES - 1, player.lane + 1);
   }, {passive:true});
 
-  // keyboard
   window.addEventListener('keydown', (e) => {
-    if(!running) {
-      if(e.key === ' '){ /* allow space to start? not necessary */ }
-      return;
-    }
+    if(!running) return;
     if(e.key === 'ArrowLeft' || e.key === 'a') player.lane = Math.max(0, player.lane - 1);
     if(e.key === 'ArrowRight' || e.key === 'd') player.lane = Math.min(LANES - 1, player.lane + 1);
     if(e.key === 'p') paused = !paused;
   });
 
-  // start/retry/share/how handlers
-  startBtn.addEventListener('click', () => {
-    startOverlayHide();
-    resetGame();
-    spawnWave();
-    requestAnimationFrame(loop);
-  });
-  function startOverlayHide(){ startOverlay.style.display = 'none'; gameoverOverlay.style.display = 'none'; }
-  retryBtn.addEventListener('click', () => {
-    startOverlayHide();
-    resetGame();
-    spawnWave();
-    requestAnimationFrame(loop);
-  });
+  startBtn.addEventListener('click', () => { startOverlay.style.display = 'none'; resetGame(); spawnWave(); requestAnimationFrame(loop); });
+  retryBtn.addEventListener('click', () => { startOverlay.style.display = 'none'; gameoverOverlay.style.display = 'none'; resetGame(); spawnWave(); requestAnimationFrame(loop); });
   howBtn.addEventListener('click', () => alert('Tap the left or right side of the screen to move lanes. Use arrow keys on desktop. Avoid other cars. Score increases with time.'));
   shareBtn.addEventListener('click', async () => {
     const text = `I scored ${Math.floor(score)} in Five-Lane Car Game! Try: ${location.href}`;
-    try{
-      if(navigator.share) await navigator.share({ title: 'Five-Lane Car Game', text });
-      else { await navigator.clipboard.writeText(text); alert('Score copied to clipboard'); }
-    }catch(e){}
+    try{ if(navigator.share) await navigator.share({ title:'Five-Lane Car Game', text }); else { await navigator.clipboard.writeText(text); alert('Score copied'); } }catch(e){ console.error(e); }
   });
 
-  // main loop
   let spawnTimer = 0;
   function loop(now){
     if(!running) return;
     if(paused){ requestAnimationFrame(loop); return; }
-
-    const dt = Math.min(40, now - lastTime) / (1000/60); // normalized
+    const dt = Math.min(40, now - lastTime) / (1000/60);
     lastTime = now;
-
-    // update score & speed
-    score += Math.floor(1 * dt * 1.0); // steady score
+    score += Math.floor(1 * dt * 1.0);
     speed += speedGrowth * dt * 1.0;
     scoreEl.textContent = Math.floor(score);
 
-    // occasionally spawn waves
     spawnTimer -= dt;
     if(spawnTimer <= 0){
       spawnWave();
-      // next spawn quicker as speed increases
-      spawnTimer = clamp(18 - (speed * 2), 6, 26); // lower => more frequent (in frames units normalized)
+      spawnTimer = clamp(18 - (speed * 2), 6, 26);
     }
 
-    // move enemies
     const base = speed;
     for(let i = enemies.length - 1; i >= 0; i--){
       const e = enemies[i];
       e.y += (base * e.speedMult) * dt;
-      // remove off-screen
       if(e.y > window.innerHeight + 200) enemies.splice(i,1);
     }
 
-    // detect collisions with player
-    const playerRect = {
-      x: laneCenters[player.lane] - player.w / 2,
-      y: player.y,
-      w: player.w,
-      h: player.h
-    };
+    const playerRect = { x: laneCenters[player.lane] - player.w / 2, y: player.y, w: player.w, h: player.h };
     for(const e of enemies){
       const enemyRect = { x: e.x, y: e.y, w: e.w, h: e.h };
-      if(rectsOverlap(playerRect, enemyRect)){
-        endGame();
-        return;
-      }
+      if(rectsOverlap(playerRect, enemyRect)){ endGame(); return; }
     }
 
-    // draw
     drawRoad();
-
-    // draw enemies
     for(const e of enemies){
-      // update x in-case laneWidth changed
       e.x = laneCenters[e.lane] - e.w/2;
       drawCar(e.x, e.y, e.w, e.h, e.color, true);
     }
-
-    // draw player (blue)
     const px = laneCenters[player.lane] - player.w/2;
     drawCar(px, player.y, player.w, player.h, '#3bb4ff', false);
 
-    // HUD drawing (optional extra) - already in DOM, but we can add subtle text on canvas too
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    // finished frame
     requestAnimationFrame(loop);
   }
 
-  // initialize layout/best & show start
   computeLayout();
   scoreEl.textContent = '0';
   bestEl.textContent = best;
-
-  // expose start overlay on load
   startOverlay.style.display = 'grid';
   gameoverOverlay.style.display = 'none';
 
-  // in case user opens with small height then rotates, recalc
-  window.addEventListener('orientationchange', () => { setTimeout(resize, 120); }, {passive:true});
-
+  window.addEventListener('orientationchange', () => { setTimeout(resize,120); }, {passive:true});
 })();
 </script>
 </body>
