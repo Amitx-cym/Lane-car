@@ -68,7 +68,7 @@ const playerHeight = 100;
 let playerY;
 
 let enemies = [];
-let speed = 2;
+let speed = 4;
 let score = 0;
 let gameRunning = false;
 
@@ -155,7 +155,7 @@ function gameLoop() {
   drawScore();
 
   score++;
-  speed += 0.001;
+  speed += 0.003;
 
   requestAnimationFrame(gameLoop);
 }
