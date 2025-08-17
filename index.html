@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Car Game with Leaderboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
     body {
       margin: 0;
@@ -18,6 +19,7 @@
       display: block;
       margin: auto;
       background: #333;
+      touch-action: none; /* prevent scroll */
     }
 
     #score {
@@ -37,12 +39,8 @@
       cursor: pointer;
     }
 
-    #restartBtn:hover {
-      background: #ff1a1a;
-    }
-
     #leaderboard {
-      margin-top: 15px;
+      margin-top: 10px;
       font-size: 18px;
       text-align: center;
     }
@@ -50,17 +48,18 @@
 </head>
 <body>
   <h2>Car Game</h2>
-  <canvas id="gameCanvas" width="400" height="600"></canvas>
-  <div id="score">Score: 0</div>
-  <button id="restartBtn">Restart</button>
 
+  <!-- Leaderboard on top -->
   <div id="leaderboard">
     <h3>Leaderboard</h3>
     <ul id="scoresList"></ul>
   </div>
 
+  <canvas id="gameCanvas"></canvas>
+  <div id="score">Score: 0</div>
+  <button id="restartBtn">Restart</button>
+
   <script type="module">
-    // 🔹 Firebase import
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -75,7 +74,6 @@
       appId: "1:47718356271:web:cab6795bf47f07f375fdda"
     };
 
-    // 🔹 Init Firebase
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
@@ -85,17 +83,35 @@
     const restartBtn = document.getElementById("restartBtn");
     const scoresList = document.getElementById("scoresList");
 
-    // 🔹 Load car images
+    // 🔹 Resize canvas to fill screen
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight * 0.75; // keep leaderboard visible
+      laneWidth = canvas.width / 5;
+      resetGame();
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    // 🔹 Load images
     const playerImg = new Image();
-    playerImg.src = "player.png"; // make sure uploaded in repo
+    playerImg.src = "player.png";
 
     const enemyImg = new Image();
-    enemyImg.src = "enemy.png"; // make sure uploaded in repo
+    enemyImg.src = "enemy.png";
 
-    let player, enemies, score, gameOver;
+    let player, enemies, score, gameOver, laneWidth;
 
     function resetGame() {
-      player = { x: 180, y: 500, width: 40, height: 70 };
+      laneWidth = canvas.width / 5;
+      const carWidth = laneWidth * 0.6;
+      const carHeight = carWidth * 1.8;
+
+      player = { 
+        x: 2 * laneWidth + (laneWidth - carWidth) / 2, 
+        y: canvas.height - carHeight - 20, 
+        width: carWidth, 
+        height: carHeight 
+      };
       enemies = [];
       score = 0;
       gameOver = false;
@@ -116,9 +132,11 @@
     function updateEnemies() {
       if (Math.random() < 0.03) {
         let lane = Math.floor(Math.random() * 5);
-        enemies.push({ x: lane * 80 + 20, y: -70, width: 40, height: 70 });
+        const carWidth = laneWidth * 0.6;
+        const carHeight = carWidth * 1.8;
+        enemies.push({ x: lane * laneWidth + (laneWidth - carWidth) / 2, y: -carHeight, width: carWidth, height: carHeight });
       }
-      enemies.forEach(e => e.y += 5);
+      enemies.forEach(e => e.y += canvas.height * 0.01); // speed depends on screen
       enemies = enemies.filter(e => e.y < canvas.height);
     }
 
@@ -149,25 +167,25 @@
 
     // 🔹 Controls
     window.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft" && player.x > 0) player.x -= 80;
-      if (e.key === "ArrowRight" && player.x < canvas.width - player.width) player.x += 80;
+      if (e.key === "ArrowLeft" && player.x > 0) player.x -= laneWidth;
+      if (e.key === "ArrowRight" && player.x < canvas.width - player.width) player.x += laneWidth;
     });
 
     window.addEventListener("touchstart", (e) => {
       let touchX = e.touches[0].clientX;
-      if (touchX < window.innerWidth / 2 && player.x > 0) player.x -= 80;
-      else if (touchX >= window.innerWidth / 2 && player.x < canvas.width - player.width) player.x += 80;
+      if (touchX < window.innerWidth / 2 && player.x > 0) player.x -= laneWidth;
+      else if (touchX >= window.innerWidth / 2 && player.x < canvas.width - player.width) player.x += laneWidth;
     });
 
     restartBtn.addEventListener("click", resetGame);
 
-    // 🔹 Save score to Firebase
+    // 🔹 Save score
     function saveScore(score) {
       const scoresRef = ref(db, "scores");
       push(scoresRef, { score: score, time: Date.now() });
     }
 
-    // 🔹 Load scores (Leaderboard)
+    // 🔹 Load leaderboard
     function loadScores() {
       const scoresRef = ref(db, "scores");
       onValue(scoresRef, (snapshot) => {
@@ -176,7 +194,7 @@
           scores.push(child.val().score);
         });
         scores.sort((a, b) => b - a);
-        scores = scores.slice(0, 5); // top 5
+        scores = scores.slice(0, 5);
         scoresList.innerHTML = "";
         scores.forEach(s => {
           let li = document.createElement("li");
@@ -187,7 +205,14 @@
     }
 
     loadScores();
-    resetGame();
+    resizeCanvas();
+
+    // 🔹 Disable double-tap zoom
+    document.addEventListener("touchend", function(e) {
+      if (e.detail === 2) {
+        e.preventDefault();
+      }
+    }, { passive: false });
   </script>
 </body>
 </html>
