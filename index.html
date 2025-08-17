@@ -74,6 +74,10 @@
     let lanes = 5;
     let laneWidth = canvas.width / lanes;
 
+    let enemySpeed = 4;  // initial speed
+    let spawnInterval = 1500; // initial spawn rate
+    let spawnTimer;
+
     // Load images
     const playerImg = new Image();
     playerImg.src = "player.png";
@@ -99,7 +103,6 @@
     // Functions
     function drawRoad() {
       ctx.drawImage(roadImg, 0, 0, canvas.width, canvas.height);
-      // lane lines
       ctx.strokeStyle = "white";
       ctx.lineWidth = 4;
       for (let i = 1; i < lanes; i++) {
@@ -139,7 +142,7 @@
 
     function moveEnemies() {
       enemies.forEach(enemy => {
-        enemy.y += 5;
+        enemy.y += enemySpeed;
       });
       enemies = enemies.filter(enemy => enemy.y < canvas.height);
     }
@@ -160,6 +163,16 @@
     function updateScore() {
       score++;
       scoreDisplay.textContent = "Score: " + score;
+
+      // Increase difficulty every 200 points
+      if (score % 200 === 0) {
+        enemySpeed += 1;
+        if (spawnInterval > 500) {
+          spawnInterval -= 100;
+          clearInterval(spawnTimer);
+          spawnTimer = setInterval(spawnEnemy, spawnInterval);
+        }
+      }
     }
 
     function gameLoop() {
@@ -180,19 +193,24 @@
       gameRunning = true;
       score = 0;
       enemies = [];
+      enemySpeed = 4;
+      spawnInterval = 1500;
       buttonsDiv.style.display = "none";
       scoreDisplay.textContent = "Score: 0";
+
       spawnEnemy();
-      setInterval(spawnEnemy, 1500);
+      spawnTimer = setInterval(spawnEnemy, spawnInterval);
+
       gameLoop();
     }
 
     function endGame() {
       gameRunning = false;
       buttonsDiv.style.display = "block";
+      clearInterval(spawnTimer);
     }
 
-    // Controls (touch left/right)
+    // Controls
     window.addEventListener("touchstart", (e) => {
       if (!gameRunning) return;
       let touchX = e.touches[0].clientX;
