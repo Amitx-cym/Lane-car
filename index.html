@@ -1,89 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Car Lane Game</title>
   <style>
     body {
       margin: 0;
-      overflow: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: center;
       background: black;
-    }
-    #gameContainer {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
       overflow: hidden;
     }
     canvas {
       display: block;
-      width: 100%;
-      height: 100%;
+      margin: 0 auto;
       background: black;
+      width: 100vw;
+      height: 100vh;
     }
     #score {
       position: absolute;
       top: 10px;
       right: 20px;
       color: white;
-      font-size: 20px;
+      font-size: 22px;
       font-family: Arial, sans-serif;
+      font-weight: bold;
     }
-    #startBtn, #restartBtn {
+    #buttons {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
+      display: none;
+      text-align: center;
+    }
+    button {
+      font-size: 20px;
       padding: 12px 24px;
-      font-size: 18px;
+      margin: 10px;
       border: none;
       border-radius: 10px;
       background: #007bff;
       color: white;
+      font-weight: bold;
       cursor: pointer;
-      z-index: 10;
     }
-    #restartBtn { display: none; }
-    #leaderboard {
-      position: absolute;
-      top: 20%;
-      left: 50%;
-      transform: translateX(-50%);
-      color: white;
-      font-family: Arial, sans-serif;
-      font-size: 18px;
-      text-align: center;
-      display: none;
+    button:hover {
+      background: #0056b3;
     }
   </style>
 </head>
 <body>
-  <div id="gameContainer">
-    <canvas id="gameCanvas"></canvas>
-    <div id="score">Score: 0</div>
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas"></canvas>
+  <div id="buttons">
     <button id="startBtn">Start Game</button>
     <button id="restartBtn">Restart</button>
-    <div id="leaderboard">
-      <h2>Leaderboard</h2>
-      <p>Your Score: <span id="finalScore">0</span></p>
-    </div>
   </div>
 
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+    const scoreDisplay = document.getElementById("score");
+    const startBtn = document.getElementById("startBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const buttonsDiv = document.getElementById("buttons");
 
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const scoreEl = document.getElementById("score");
-    const startBtn = document.getElementById("startBtn");
-    const restartBtn = document.getElementById("restartBtn");
-    const leaderboard = document.getElementById("leaderboard");
-    const finalScore = document.getElementById("finalScore");
+    let gameRunning = false;
+    let score = 0;
+    let lanes = 5;
+    let laneWidth = canvas.width / lanes;
 
     // Load images
     const playerImg = new Image();
@@ -95,165 +84,131 @@
     const roadImg = new Image();
     roadImg.src = "road.png";
 
-    let player, enemies, score, gameOver, gameRunning, laneWidth;
+    // Player setup
+    let player = {
+      x: laneWidth * 2 + laneWidth * 0.2,
+      y: canvas.height - laneWidth * 1.5,
+      width: laneWidth * 0.6,
+      height: laneWidth * 1.2,
+      lane: 2
+    };
 
-    function resetGame() {
-      laneWidth = canvas.width / 5;
-      const carWidth = laneWidth / 2;
-      const carHeight = carWidth * 2;
+    // Enemy list
+    let enemies = [];
 
-      player = {
-        x: laneWidth * 2 + laneWidth / 4,
-        y: canvas.height - carHeight - 20,
-        width: carWidth,
-        height: carHeight,
-        lane: 2
-      };
-
-      enemies = [];
-      score = 0;
-      gameOver = false;
-    }
-
+    // Functions
     function drawRoad() {
-      if (roadImg.complete && roadImg.naturalWidth !== 0) {
-        ctx.drawImage(roadImg, 0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.fillStyle = "gray";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-
+      ctx.drawImage(roadImg, 0, 0, canvas.width, canvas.height);
       // lane lines
       ctx.strokeStyle = "white";
       ctx.lineWidth = 4;
-      for (let i = 1; i < 5; i++) {
+      for (let i = 1; i < lanes; i++) {
+        let x = i * laneWidth;
         ctx.beginPath();
-        ctx.moveTo(i * laneWidth, 0);
-        ctx.lineTo(i * laneWidth, canvas.height);
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
         ctx.stroke();
       }
     }
 
     function drawPlayer() {
-      if (playerImg.complete && playerImg.naturalWidth !== 0) {
-        ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
-      } else {
-        ctx.fillStyle = "red"; // fallback if PNG fails
-        ctx.fillRect(player.x, player.y, player.width, player.height);
-      }
+      ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
     }
 
     function drawEnemies() {
       enemies.forEach(enemy => {
-        if (enemyImg.complete && enemyImg.naturalWidth !== 0) {
-          ctx.drawImage(enemyImg, enemy.x, enemy.y, enemy.width, enemy.height);
-        } else {
-          ctx.fillStyle = "yellow";
-          ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-        }
+        ctx.drawImage(enemyImg, enemy.x, enemy.y, enemy.width, enemy.height);
       });
     }
 
-    function moveEnemies() {
-      enemies.forEach(enemy => { enemy.y += 5; });
-      enemies = enemies.filter(enemy => enemy.y < canvas.height);
+    function spawnEnemy() {
+      const carWidth = laneWidth * 0.6;
+      const carHeight = laneWidth * 1.2;
+      const lane = Math.floor(Math.random() * lanes);
 
-      if (Math.random() < 0.02) {
-        const lane = Math.floor(Math.random() * 5);
-        const carWidth = laneWidth / 2;
-        const carHeight = carWidth * 2;
-        enemies.push({
-          x: lane * laneWidth + laneWidth / 4,
-          y: -carHeight,
-          width: carWidth,
-          height: carHeight
-        });
-      }
+      const enemy = {
+        x: lane * laneWidth + (laneWidth - carWidth) / 2,
+        y: -carHeight,
+        width: carWidth,
+        height: carHeight,
+        lane: lane
+      };
+
+      enemies.push(enemy);
     }
 
-    function detectCollision() {
+    function moveEnemies() {
+      enemies.forEach(enemy => {
+        enemy.y += 5;
+      });
+      enemies = enemies.filter(enemy => enemy.y < canvas.height);
+    }
+
+    function checkCollision() {
       for (let enemy of enemies) {
-        if (player.x < enemy.x + enemy.width &&
-            player.x + player.width > enemy.x &&
-            player.y < enemy.y + enemy.height &&
-            player.y + player.height > enemy.y) {
-          gameOver = true;
-          return true;
+        if (
+          player.x < enemy.x + enemy.width &&
+          player.x + player.width > enemy.x &&
+          player.y < enemy.y + enemy.height &&
+          player.y + player.height > enemy.y
+        ) {
+          endGame();
         }
       }
-      return false;
     }
 
     function updateScore() {
       score++;
-      scoreEl.innerText = "Score: " + score;
+      scoreDisplay.textContent = "Score: " + score;
     }
 
     function gameLoop() {
       if (!gameRunning) return;
-
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       drawRoad();
       drawPlayer();
       drawEnemies();
       moveEnemies();
+      checkCollision();
       updateScore();
-
-      if (detectCollision()) {
-        endGame();
-        return;
-      }
 
       requestAnimationFrame(gameLoop);
     }
 
-    function endGame() {
-      gameRunning = false;
-      restartBtn.style.display = "block";
-      leaderboard.style.display = "block";
-      finalScore.textContent = score;
+    function startGame() {
+      gameRunning = true;
+      score = 0;
+      enemies = [];
+      buttonsDiv.style.display = "none";
+      scoreDisplay.textContent = "Score: 0";
+      spawnEnemy();
+      setInterval(spawnEnemy, 1500);
+      gameLoop();
     }
 
-    startBtn.addEventListener("click", () => {
-      resetGame();
-      startBtn.style.display = "none";
-      restartBtn.style.display = "none";
-      leaderboard.style.display = "none";
-      gameRunning = true;
-      gameLoop();
-    });
+    function endGame() {
+      gameRunning = false;
+      buttonsDiv.style.display = "block";
+    }
 
-    restartBtn.addEventListener("click", () => {
-      resetGame();
-      restartBtn.style.display = "none";
-      leaderboard.style.display = "none";
-      gameRunning = true;
-      gameLoop();
-    });
-
-    // Controls
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft" && player.lane > 0) {
-        player.lane--;
-        player.x = player.lane * laneWidth + laneWidth / 4;
-      }
-      if (e.key === "ArrowRight" && player.lane < 4) {
-        player.lane++;
-        player.x = player.lane * laneWidth + laneWidth / 4;
-      }
-    });
-
-    // Touch controls (tap left/right)
+    // Controls (touch left/right)
     window.addEventListener("touchstart", (e) => {
-      const touchX = e.touches[0].clientX;
-      if (touchX < window.innerWidth / 2 && player.lane > 0) {
+      if (!gameRunning) return;
+      let touchX = e.touches[0].clientX;
+      if (touchX < canvas.width / 2 && player.lane > 0) {
         player.lane--;
-      } else if (touchX > window.innerWidth / 2 && player.lane < 4) {
+      } else if (touchX > canvas.width / 2 && player.lane < lanes - 1) {
         player.lane++;
       }
-      player.x = player.lane * laneWidth + laneWidth / 4;
+      player.x = player.lane * laneWidth + (laneWidth - player.width) / 2;
     });
+
+    // Buttons
+    startBtn.addEventListener("click", startGame);
+    restartBtn.addEventListener("click", startGame);
+
+    buttonsDiv.style.display = "block";
   </script>
 </body>
 </html>
